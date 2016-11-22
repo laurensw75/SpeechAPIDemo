@@ -25,10 +25,40 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.roufid.tutorials.AppTest</mainClass>
+                            <mainClass>SpeechAPIDemo</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.10</version>
+                <executions>
+                    <execution>
+                        <id>copy</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>netspeechapi</groupId>
+                                    <artifactId>netspeechapi</artifactId>
+                                    <version>0.2.0</version>
+                                    <type>jar</type>
+                                    <overWrite>false</overWrite>
+                                    <outputDirectory>${project.build.directory}/alternateLocation</outputDirectory>
+                                    <destFileName>netspeechapi.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}/wars</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -44,11 +74,9 @@
             <version>1.1</version>
         </dependency>
         <dependency>
-            <groupId>ee.ioc.phon.netspeechapi</groupId>
-            <artifactId>net-speech-api</artifactId>
+            <groupId>netspeechapi</groupId>
+            <artifactId>netspeechapi</artifactId>
             <version>0.2.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/net-speech-api-0.2.0.jar</systemPath>
         </dependency>
     </dependencies>
 
