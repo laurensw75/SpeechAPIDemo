@@ -1,5 +1,8 @@
 # SpeechAPIDemo
-Small JAVA application demonstrating the use of the net-speech-api for kaldigstserver
+JAVA application demonstrating the use of the net-speech-api for kaldigstserver.
 
-Unfortunately, I have been unable to run this from outside the IDE. You're welcome to try and make it work.
-I've given up on it :(
+Large parts of the code are based on https://github.com/Kaljurand/net-speech-api, and this code 
+can be used as a starting point for a client using kaldigstserver (https://github.com/alumae/kaldi-gstreamer-server).
+
+
+
