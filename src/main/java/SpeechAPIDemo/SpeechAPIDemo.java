@@ -424,13 +424,8 @@ public class SpeechAPIDemo extends JFrame {
     TargetDataLine targetDataLine;
     static AudioInputStream audioInputStream;
 
-    // 8890 = English Tedlium
-    // 8889 = Dutch NLSpraak
-    static int websocket=8889;
-    static String server="nlspraak.ewi.utwente.nl";
-
-    public static final String DEFAULT_WS_URL = "ws://"+server+":"+websocket+"/client/ws/speech";
-    public static final String DEFAULT_WS_STATUS_URL = "ws://"+server+":"+websocket+"/client/ws/status";
+    private static String DEFAULT_WS_URL;
+    private static String DEFAULT_WS_STATUS_URL;
 
     static class RecognitionEventAccumulator implements RecognitionEventListener, WorkerCountInterface {
 
@@ -504,7 +499,7 @@ public class SpeechAPIDemo extends JFrame {
         }
     }
 
-    public static String testRecognition(File SpeechFile) throws MalformedURLException, IOException, URISyntaxException, InterruptedException {
+    private static String testRecognition(File SpeechFile) throws MalformedURLException, IOException, URISyntaxException, InterruptedException {
         RecognitionEventAccumulator eventAccumulator = new RecognitionEventAccumulator();
         WsDuplexRecognitionSession session = new WsDuplexRecognitionSession(DEFAULT_WS_URL);
         session.addRecognitionEventListener(eventAccumulator);
@@ -595,7 +590,13 @@ public class SpeechAPIDemo extends JFrame {
     }
 
     public static void main(String[] args) {
-        new SpeechAPIDemo();
+        if ((args.length==2) && (args[1].matches("[0-9]+"))) {
+            DEFAULT_WS_URL = "ws://"+args[0]+":"+args[1]+"/client/ws/speech";
+            DEFAULT_WS_STATUS_URL = "ws://"+args[0]+":"+args[1]+"/client/ws/status";
+            new SpeechAPIDemo();
+        } else {
+            System.out.println("Please specify server and port to use");
+        }
     }
 
     private static void RecognizeAudio() throws MalformedURLException, IOException, URISyntaxException, InterruptedException {
