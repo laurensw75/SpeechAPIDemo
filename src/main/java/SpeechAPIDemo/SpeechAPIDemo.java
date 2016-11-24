@@ -27,17 +27,17 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.json.simple.parser.JSONParser;
 
-//
-// The following code was taken from https://github.com/Kaljurand/net-speech-api
-// part of Net Speech API.
-// Copyright 2011, Institute of Cybernetics at Tallinn University of Technology
-//
-
 interface WorkerCountInterface {
     void notifyWorkerCount(int count);
     void notifyRequests(int count);
     void notifyDescription(String description);
 }
+
+//
+// The following code was taken from https://github.com/Kaljurand/net-speech-api
+// part of Net Speech API.
+// Copyright 2011, Institute of Cybernetics at Tallinn University of Technology
+//
 
 interface DuplexRecognitionSession {
     void connect() throws IOException;
@@ -48,54 +48,6 @@ interface DuplexRecognitionSession {
 interface RecognitionEventListener {
     void onRecognitionEvent(RecognitionEvent var1);
     void onClose();
-}
-
-class WorkerCountClient extends WebSocketClient {
-
-    private WorkerCountInterface handler;
-
-    public WorkerCountClient(URI serverURI, WorkerCountInterface handler) {
-        super(serverURI);
-        this.handler = handler;
-    }
-
-    @Override
-    public void onClose(int code, String reason, boolean remote) {
-    }
-
-    @Override
-    public void onError(Exception arg0) {
-        System.err.println("****** Exception: "+arg0);
-    }
-
-    @Override
-    public void onMessage(String msg) {
-        Object obj = JSONValue.parse(msg);
-
-        if ( obj != null ) {
-            JSONObject jsonObj = (JSONObject) obj;
-            if (jsonObj.containsKey("description")) {
-                Object lo =jsonObj.get("description");
-                String description = lo.toString();
-                this.handler.notifyDescription( description );
-            }
-            if (jsonObj.containsKey("num_workers_available")) {
-                Object lo = jsonObj.get("num_workers_available");
-                int n_workers = ((Long)lo).intValue();
-                this.handler.notifyWorkerCount( n_workers );
-            }
-            if (jsonObj.containsKey("num_requests_processed")) {
-                Object lo = jsonObj.get("num_requests_processed");
-                int n_requests = ((Long)lo).intValue();
-                this.handler.notifyRequests( n_requests );
-            }
-        }
-    }
-
-    @Override
-    public void onOpen(ServerHandshake arg0) {
-    }
-
 }
 
 class RecognitionEvent {
@@ -399,6 +351,54 @@ class WsDuplexRecognitionSession implements DuplexRecognitionSession {
 // The preceding code was taken from https://github.com/Kaljurand/net-speech-api
 //
 
+class WorkerCountClient extends WebSocketClient {
+
+    private WorkerCountInterface handler;
+
+    public WorkerCountClient(URI serverURI, WorkerCountInterface handler) {
+        super(serverURI);
+        this.handler = handler;
+    }
+
+    @Override
+    public void onClose(int code, String reason, boolean remote) {
+    }
+
+    @Override
+    public void onError(Exception arg0) {
+        System.err.println("****** Exception: "+arg0);
+    }
+
+    @Override
+    public void onMessage(String msg) {
+        Object obj = JSONValue.parse(msg);
+
+        if ( obj != null ) {
+            JSONObject jsonObj = (JSONObject) obj;
+            if (jsonObj.containsKey("description")) {
+                Object lo =jsonObj.get("description");
+                String description = lo.toString();
+                this.handler.notifyDescription( description );
+            }
+            if (jsonObj.containsKey("num_workers_available")) {
+                Object lo = jsonObj.get("num_workers_available");
+                int n_workers = ((Long)lo).intValue();
+                this.handler.notifyWorkerCount( n_workers );
+            }
+            if (jsonObj.containsKey("num_requests_processed")) {
+                Object lo = jsonObj.get("num_requests_processed");
+                int n_requests = ((Long)lo).intValue();
+                this.handler.notifyRequests( n_requests );
+            }
+        }
+    }
+
+    @Override
+    public void onOpen(ServerHandshake arg0) {
+    }
+
+}
+
 public class SpeechAPIDemo extends JFrame {
 
     private static final long serialVersionUID = 1L;
@@ -417,7 +417,7 @@ public class SpeechAPIDemo extends JFrame {
     final static JCheckBox liveBox = new JCheckBox("Live Recognition");
 
     private static JLabel statusLabel = new JLabel("Available Slots: ");
-    private static JLabel langLabel = new JLabel("Language / Modeltype: ");
+    private static JLabel langLabel = new JLabel("");
 
     static ByteArrayOutputStream byteArrayOutputStream;
     AudioFormat audioFormat;
@@ -426,6 +426,8 @@ public class SpeechAPIDemo extends JFrame {
 
     private static String DEFAULT_WS_URL;
     private static String DEFAULT_WS_STATUS_URL;
+    private static String UserID = "unknown";
+    private static String ContentID = "unknown";
 
     static class RecognitionEventAccumulator implements RecognitionEventListener, WorkerCountInterface {
 
@@ -590,9 +592,15 @@ public class SpeechAPIDemo extends JFrame {
     }
 
     public static void main(String[] args) {
-        if ((args.length==2) && (args[1].matches("[0-9]+"))) {
-            DEFAULT_WS_URL = "ws://"+args[0]+":"+args[1]+"/client/ws/speech";
-            DEFAULT_WS_STATUS_URL = "ws://"+args[0]+":"+args[1]+"/client/ws/status";
+        if ((args.length>0) && (args[0].matches("^.*:[0-9]+$"))) {
+            DEFAULT_WS_URL = "ws://"+args[0]+"/client/ws/speech";
+            DEFAULT_WS_STATUS_URL = "ws://"+args[0]+"/client/ws/status";
+            if (args.length>1) {
+                UserID=args[1];
+            }
+            if (args.length>2) {
+                ContentID=args[2];
+            }
             new SpeechAPIDemo();
         } else {
             System.out.println("Please specify server and port to use");
@@ -629,14 +637,15 @@ public class SpeechAPIDemo extends JFrame {
         }
 
         int fontsize=(int)(16*scale);
-        filechooseBtn.setFont(new Font("Arial", Font.PLAIN, fontsize));
-        captureBtn.setFont(new Font("Arial", Font.PLAIN, fontsize));
-        stopBtn.setFont(new Font("Arial", Font.PLAIN, fontsize));
-        playBtn.setFont(new Font("Arial", Font.PLAIN, fontsize));
-        liveBox.setFont(new Font("Arial", Font.PLAIN, fontsize));
+        Font defaultFont=new Font("Arial", Font.PLAIN, fontsize);
+        filechooseBtn.setFont(defaultFont);
+        captureBtn.setFont(defaultFont);
+        stopBtn.setFont(defaultFont);
+        playBtn.setFont(defaultFont);
+        liveBox.setFont(defaultFont);
 
-        statusLabel.setFont(new Font("Arial", Font.PLAIN, fontsize));
-        langLabel.setFont(new Font("Arial", Font.PLAIN, fontsize));
+        statusLabel.setFont(defaultFont);
+        langLabel.setFont(defaultFont);
 
         filechooseBtn.setEnabled(true);
         captureBtn.setEnabled(true);
@@ -673,8 +682,8 @@ public class SpeechAPIDemo extends JFrame {
                                 RecognitionEventAccumulator eventAccumulator = new RecognitionEventAccumulator();
                                 session = new WsDuplexRecognitionSession(DEFAULT_WS_URL);
                                 session.addRecognitionEventListener(eventAccumulator);
-                                session.setUserId("laurensw");
-                                session.setContentId("SpeechAPIDemo");
+                                session.setUserId(UserID);
+                                session.setContentId(ContentID);
                                 session.connect();
                             } catch (Exception e2){
                                 System.err.println("Caught Exception: " + e2.getMessage());
@@ -717,10 +726,10 @@ public class SpeechAPIDemo extends JFrame {
         JScrollPane scrollPane = new JScrollPane(resultArea);
         textArea.setEditable(false);
         textArea.setLineWrap(true);
-        textArea.setFont(new Font("Arial", Font.PLAIN, fontsize));
+        textArea.setFont(defaultFont);
         resultArea.setEditable(false);
         resultArea.setLineWrap(true);
-        resultArea.setFont(new Font("Arial", Font.PLAIN, fontsize));
+        resultArea.setFont(defaultFont);
 
         GroupLayout layout=new GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
