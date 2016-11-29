@@ -603,7 +603,7 @@ public class SpeechAPIDemo extends JFrame {
             }
             new SpeechAPIDemo();
         } else {
-            System.out.println("Please specify server and port to use");
+            System.out.println("Please specify server and port to use (this.is.my.server:0000)");
         }
     }
 
