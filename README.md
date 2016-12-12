@@ -10,7 +10,7 @@ You can compile this program using:
 
 And then run with:
 
-`$ java -jar target/SpeechAPIDemo.jar server:port [userid] [contentid]`
+`$ java -jar target/SpeechAPIDemo-1.0.jar server:port [userid] [contentid]`
 
 The server is assumed to be running on ws://server:port/client/ws/speech, with status info on ws://server:port/client/ws/status.
 
