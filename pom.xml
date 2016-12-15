@@ -54,7 +54,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>SpeechAPIDemo</mainClass>
+                            <mainClass>SpeechAPIDemo.ExampleApp</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
