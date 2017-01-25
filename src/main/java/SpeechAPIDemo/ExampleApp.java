@@ -1,10 +1,8 @@
 package SpeechAPIDemo;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -20,31 +18,37 @@ import org.json.simple.JSONValue;
 import java.net.URI;
 import java.util.List;
 
+
+
 public class ExampleApp extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
+    private static float scale;
+
+    private static VUMeter vumeter;
     private static JTextArea textArea;
     private static JTextArea resultArea;
+    private static JTextArea ctmresultArea;
+    private static JTabbedPane resultsArea;
+    private static JScrollPane resultscrollPane;
+    private static JScrollPane ctmresultscrollPane;
 
     boolean stopCapture = false;
     static boolean sendPong = false;
-    static boolean bufferFilled = false;
     static boolean workersAvailable = false;
+    static boolean liveRecognition = false;
+    static boolean fileRecognition = false;
 
     final static JButton filechooseBtn = new JButton("Select File");
-    final static JButton captureBtn = new JButton("Capture");
-    final static JButton stopBtn = new JButton("Stop");
-    final static JButton playBtn = new JButton("Recognize");
-    final static JCheckBox liveBox = new JCheckBox("Live Recognition");
+    final static JButton liveBtn = new JButton("Start Live Recognition");
+    final Font defaultFont;
 
     private static JLabel statusLabel = new JLabel("");
     private static JLabel langLabel = new JLabel("");
 
-    static ByteArrayOutputStream byteArrayOutputStream;
     AudioFormat audioFormat;
     TargetDataLine targetDataLine;
-    static AudioInputStream audioInputStream;
 
     private static String DEFAULT_WS_URL;
     private static String DEFAULT_WS_STATUS_URL;
@@ -59,18 +63,16 @@ public class ExampleApp extends JFrame {
         public void notifyWorkerCount(int count) {
             if (count>0) {
                 workersAvailable = true;
-                filechooseBtn.setEnabled(true);
-                captureBtn.setEnabled(true);
-                if(bufferFilled) {
-                    playBtn.setEnabled(true);
+                if(!liveRecognition && !fileRecognition) {
+                    filechooseBtn.setEnabled(true);
+                    liveBtn.setEnabled(true);
                 }
                 statusLabel.setText("Available slots: "+count);
             } else if (count == 0) {
                 workersAvailable = false;
                 filechooseBtn.setEnabled(false);
-                playBtn.setEnabled(false);
-                if (liveBox.isSelected()) {
-                    captureBtn.setEnabled(false);
+                if(!liveRecognition) {
+                    liveBtn.setEnabled(false);
                 }
                 statusLabel.setText("No slots available!");
             } else {
@@ -124,8 +126,25 @@ public class ExampleApp extends JFrame {
                 sendPong=true;
             }
             if (event.getResult().isFinal()) {
-                resultArea.append(event.getResult().getHypotheses().get(0).getTranscript() + " (" + String.format("%.3f", event.getResult().getHypotheses().get(0).getConfidence()) + ")\n");
-                resultArea.update(resultArea.getGraphics());
+                // resultArea.append(event.getResult().getHypotheses().get(0).getTranscript() + " (" + String.format("%.3f", event.getResult().getHypotheses().get(0).getConfidence()) + ")\n");
+                resultArea.append(event.getResult().getHypotheses().get(0).getTranscript() +"\n");
+                ctmresultArea.append(event.getResult().getHypotheses().get(0).getCtmline());
+                textArea.setText("");
+                // System.err.println("IDX: " + resultsArea.getSelectedIndex());
+                if(resultsArea.getSelectedIndex() == 0 ) {
+                    resultArea.update(resultArea.getGraphics());
+                    if (!resultscrollPane.getVerticalScrollBar().getValueIsAdjusting()) {
+                        resultscrollPane.getVerticalScrollBar().setValue(resultscrollPane.getVerticalScrollBar().getMaximum());
+                    }
+                    resultArea.update(resultArea.getGraphics());
+                } else if (resultsArea.getSelectedIndex() == 1 ) {
+                    ctmresultArea.update(ctmresultArea.getGraphics());
+                    if (!ctmresultscrollPane.getVerticalScrollBar().getValueIsAdjusting()) {
+                        ctmresultscrollPane.getVerticalScrollBar().setValue(ctmresultscrollPane.getVerticalScrollBar().getMaximum());
+                    }
+                    ctmresultArea.update(ctmresultArea.getGraphics());
+                }
+
             }
         }
 
@@ -153,6 +172,7 @@ public class ExampleApp extends JFrame {
             }
         }
 
+        fileRecognition=false;
         RecognitionEvent lastEvent = eventAccumulator.getEvents().get(eventAccumulator.getEvents().size() - 2);
         String result="";
         result=lastEvent.getResult().getHypotheses().get(0).getTranscript();
@@ -182,49 +202,17 @@ public class ExampleApp extends JFrame {
 
                 if (size == bytesPerSecond / chunksPerSecond) {
                     session.sendChunk(buf, false);
+
                 } else {
                     byte buf2[] = Arrays.copyOf(buf, size);
                     session.sendChunk(buf2, true);
                     break;
                 }
-                // Thread.sleep(1000 / chunksPerSecond - millisWithinChunkSecond);
+                Thread.sleep(50);
             }
             in.close();
         } catch (Exception e) {
             System.out.println("File could not be processed " + e);
-        }
-    }
-
-    private static void sendStream(DuplexRecognitionSession session, ByteArrayOutputStream bAOS) throws IOException, InterruptedException {
-        int chunksPerSecond = 4;
-
-        byte audioData[] = bAOS.toByteArray();
-        InputStream byteArrayInputStream = new ByteArrayInputStream(audioData);
-        AudioFormat audioFormat = getAudioFormat();
-        int bytesPerSecond = (int) (audioFormat.getSampleRate() * 2);
-
-        byte buf[] = new byte[bytesPerSecond / chunksPerSecond];
-
-        while (true) {
-            long millisWithinChunkSecond = System.currentTimeMillis() % (1000 / chunksPerSecond);
-
-            int size = byteArrayInputStream.read(buf, 0, buf.length);
-
-            System.err.println("Chunk size:" + size);
-            if (size < 0) {
-                byte buf2[] = new byte[0];
-                session.sendChunk(buf2, true);
-                break;
-            }
-
-            if (size == bytesPerSecond / chunksPerSecond) {
-                session.sendChunk(buf, false);
-            } else {
-                byte buf2[] = Arrays.copyOf(buf, size);
-                session.sendChunk(buf2, true);
-                break;
-            }
-            Thread.sleep(1000/chunksPerSecond - millisWithinChunkSecond);
         }
     }
 
@@ -244,28 +232,51 @@ public class ExampleApp extends JFrame {
         }
     }
 
-    private static void RecognizeAudio() throws MalformedURLException, IOException, URISyntaxException, InterruptedException {
-        RecognitionEventAccumulator eventAccumulator = new RecognitionEventAccumulator();
-        WsDuplexRecognitionSession session = new WsDuplexRecognitionSession(DEFAULT_WS_URL);
-        session.addRecognitionEventListener(eventAccumulator);
-        session.setUserId("laurensw");
-        session.setContentId("SpeechAPIDemo");
+    public void setFileChooserFont(Component[] comp, Font font) {
+        for(int x = 0; x < comp.length; x++)
+        {
+            if(comp[x] instanceof Container) setFileChooserFont(((Container)comp[x]).getComponents(), font);
+            try{comp[x].setFont(font);}
+            catch(Exception e){}//do nothing
+        }
+    }
 
-        session.connect();
-
-        sendStream(session, byteArrayOutputStream);
+    class SaveActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent actionEvent) {
+            if (actionEvent.getActionCommand().equals("Save text...") || actionEvent.getActionCommand().equals("Save ctm...")) {
+                JFileChooser fc = new JFileChooser();
+                setFileChooserFont(fc.getComponents(), defaultFont);
+                fc.setPreferredSize(new Dimension((int) scale * 600, (int) scale * 400));
+                int returnVal = fc.showSaveDialog(getParent());
+                if (returnVal == JFileChooser.APPROVE_OPTION) {
+                    try {
+                        FileWriter fw = new FileWriter(fc.getSelectedFile().getAbsoluteFile());
+                        if (actionEvent.getActionCommand().equals("Save text...")) {
+                            fw.write(resultArea.getText().toString());
+                        } else {
+                            fw.write(ctmresultArea.getText().toString());
+                        }
+                        fw.close();
+                    } catch (IOException e2) {
+                        System.err.println("Caught Exception: " + e2.getMessage());
+                    }
+                }
+                System.out.println("Selected: " + actionEvent.getActionCommand());
+            }
+        }
     }
 
     public ExampleApp() {
-        float scale = 1;
+        scale = 1;
         int screenwidth = (int)Toolkit.getDefaultToolkit().getScreenSize().getWidth();
-        // This is an ugly hack, but the dpi value on hidpi screens is wrong :(
+        // This is an ugly hack, but the dpi value we receive on hidpi screens is wrong :(
         if (screenwidth > 3000) {
             scale=2;
         }
 
         int fontsize=(int)(16*scale);
-        Font defaultFont=new Font("Arial", Font.PLAIN, fontsize);
+        defaultFont=new Font("Arial", Font.PLAIN, fontsize);
+        final Font fixedFont=new Font("Courier", Font.PLAIN, fontsize);
         javax.swing.UIManager.put("OptionPane.buttonFont", defaultFont);
         javax.swing.UIManager.put("OptionPane.messageFont", defaultFont);
 
@@ -279,23 +290,23 @@ public class ExampleApp extends JFrame {
         }
 
         filechooseBtn.setFont(defaultFont);
-        captureBtn.setFont(defaultFont);
-        stopBtn.setFont(defaultFont);
-        playBtn.setFont(defaultFont);
-        liveBox.setFont(defaultFont);
+        liveBtn.setFont(defaultFont);
 
         statusLabel.setFont(defaultFont);
         langLabel.setFont(defaultFont);
 
         filechooseBtn.setEnabled(true);
-        captureBtn.setEnabled(true);
-        stopBtn.setEnabled(false);
-        playBtn.setEnabled(false);
+        liveBtn.setEnabled(true);
 
         filechooseBtn.addActionListener(
                 new ActionListener(){
                     public void actionPerformed(ActionEvent e){
+                        liveBtn.setEnabled(false);
+                        filechooseBtn.setEnabled(false);
+                        fileRecognition=true;
                         JFileChooser fc = new JFileChooser();
+                        setFileChooserFont(fc.getComponents(), defaultFont);
+                        fc.setPreferredSize(new Dimension((int)scale*600, (int)scale*400));
                         int returnVal = fc.showOpenDialog(getParent());
                         if(returnVal == JFileChooser.APPROVE_OPTION) {
                             try {
@@ -303,21 +314,31 @@ public class ExampleApp extends JFrame {
                             } catch (IOException|URISyntaxException|InterruptedException e2 ) {
                                 System.err.println("Caught Exception: " + e2.getMessage());
                             }
+                        } else {
+                            liveBtn.setEnabled(true);
+                            filechooseBtn.setEnabled(true);
+                            fileRecognition=false;
+
                         }
                     }
                 }
         );
 
         //Register anonymous listeners
-        captureBtn.addActionListener(
+        liveBtn.addActionListener(
                 new ActionListener(){
                     public void actionPerformed(ActionEvent e){
-                        captureBtn.setEnabled(false);
-                        stopBtn.setEnabled(true);
-                        playBtn.setEnabled(false);
-                        //Capture input data from the microphone until the Stop button is clicked.
-                        WsDuplexRecognitionSession session = null;
-                        if (liveBox.isSelected()) {
+                        if(liveRecognition) {
+                            liveRecognition=false;
+                            stopCapture = true;
+                            targetDataLine.close();
+                            filechooseBtn.setEnabled(true);
+                            liveBtn.setText("Start Live Recognition");
+                        } else {
+                            liveRecognition=true;
+                            liveBtn.setText("Stop Live Recognition");
+                            filechooseBtn.setEnabled(false);
+                            WsDuplexRecognitionSession session = null;
                             try {
                                 RecognitionEventAccumulator eventAccumulator = new RecognitionEventAccumulator();
                                 session = new WsDuplexRecognitionSession(DEFAULT_WS_URL);
@@ -325,37 +346,10 @@ public class ExampleApp extends JFrame {
                                 session.setUserId(UserID);
                                 session.setContentId(ContentID);
                                 session.connect();
-                            } catch (Exception e2){
+                            } catch (Exception e2) {
                                 System.err.println("Caught Exception: " + e2.getMessage());
                             }
-                        }
-                        captureAudio(session);
-                    }
-                }
-        );
-
-        stopBtn.addActionListener(
-                new ActionListener(){
-                    public void actionPerformed(ActionEvent e){
-                        captureBtn.setEnabled(true);
-                        stopBtn.setEnabled(false);
-                        playBtn.setEnabled(true);
-                        bufferFilled = true;
-                        //Terminate the capturing of input data from the microphone.
-                        stopCapture = true;
-                        targetDataLine.close();
-                    }
-                }
-        );
-
-        playBtn.addActionListener(
-                new ActionListener(){
-                    public void actionPerformed(ActionEvent e){
-                        // Perform recognition on captures audio
-                        try {
-                            RecognizeAudio();
-                        } catch (IOException|URISyntaxException|InterruptedException e2 ) {
-                            System.err.println("Caught Exception: " + e2.getMessage());
+                            captureAudio(session);
                         }
                     }
                 }
@@ -363,13 +357,65 @@ public class ExampleApp extends JFrame {
 
         textArea = new JTextArea(3,30);
         resultArea = new JTextArea(10,30);
-        JScrollPane scrollPane = new JScrollPane(resultArea);
+        final JPopupMenu saveTxtMenu = new JPopupMenu();
+        ActionListener saveListener = new SaveActionListener();
+        JMenuItem saveTxtItem = new JMenuItem("Save text...");
+        saveTxtItem.addActionListener(saveListener);
+        saveTxtMenu.add(saveTxtItem);
+        saveTxtItem.setFont(defaultFont);
+        resultArea.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                super.mousePressed(e);
+                saveTxtMenu.show(e.getComponent(), e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                super.mouseReleased(e);
+                saveTxtMenu.setVisible(false);
+            }
+        });
+        ctmresultArea = new JTextArea(10,30);
+        final JPopupMenu saveCtmMenu = new JPopupMenu();
+        JMenuItem saveCtmItem = new JMenuItem("Save ctm...");
+        saveCtmItem.addActionListener(saveListener);
+        saveCtmMenu.add(saveCtmItem);
+        saveCtmItem.setFont(defaultFont);
+        ctmresultArea.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                super.mousePressed(e);
+                saveCtmMenu.show(e.getComponent(), e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                super.mouseReleased(e);
+                saveCtmMenu.setVisible(false);
+            }
+        });
+
+        vumeter= new VUMeter();
+        vumeter.setSize(100,10);
+
+        resultscrollPane = new JScrollPane(resultArea);
+        ctmresultscrollPane = new JScrollPane(ctmresultArea);
         textArea.setEditable(false);
         textArea.setLineWrap(true);
         textArea.setFont(defaultFont);
         resultArea.setEditable(false);
         resultArea.setLineWrap(true);
         resultArea.setFont(defaultFont);
+        ctmresultArea.setEditable(false);
+        ctmresultArea.setLineWrap(true);
+        ctmresultArea.setFont(fixedFont);
+
+        resultsArea = new JTabbedPane();
+        resultsArea.addTab("txt", resultscrollPane);
+        resultsArea.addTab("ctm", ctmresultscrollPane);
+        resultsArea.setTabPlacement(JTabbedPane.BOTTOM);
+        resultsArea.setFont(defaultFont);
 
         GroupLayout layout=new GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -379,12 +425,10 @@ public class ExampleApp extends JFrame {
                 layout.createParallelGroup(GroupLayout.Alignment.CENTER)
                         .addGroup(layout.createSequentialGroup()
                                 .addComponent(filechooseBtn)
-                                .addComponent(captureBtn)
-                                .addComponent(stopBtn)
-                                .addComponent(playBtn)
-                                .addComponent(liveBox))
+                                .addComponent(liveBtn)
+                                .addComponent(vumeter))
                         .addComponent(textArea)
-                        .addComponent(scrollPane)
+                        .addComponent(resultsArea)
                         .addComponent(statusLabel)
                         .addComponent(langLabel)
         );
@@ -392,19 +436,20 @@ public class ExampleApp extends JFrame {
                 layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
                                 .addComponent(filechooseBtn)
-                                .addComponent(captureBtn)
-                                .addComponent(stopBtn)
-                                .addComponent(playBtn)
-                                .addComponent(liveBox))
+                                .addComponent(liveBtn)
+                                .addComponent(vumeter))
                         .addComponent(textArea)
-                        .addComponent(scrollPane)
+                        .addComponent(resultsArea)
                         .addComponent(statusLabel)
                         .addComponent(langLabel)
         );
-        setTitle("Capture/Recognize Demo");
+
+        setTitle("Online Recognizer Demo");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize((int)(600*scale),(int)(400*scale));
         setVisible(true);
+        vumeter.setlevel(0f);
+
     }
 
     //This method captures audio input from a microphone and saves it in a ByteArrayOutputStream object.
@@ -427,6 +472,7 @@ public class ExampleApp extends JFrame {
         }
     }
 
+
     private static AudioFormat getAudioFormat(){
         float sampleRate = 16000.0F;	//8000,11025,16000,22050,44100
         int sampleSizeInBits = 16;		//8,16
@@ -441,6 +487,16 @@ public class ExampleApp extends JFrame {
                 bigEndian);
     }
 
+    float getLevel(byte[] buffer) {
+        int max=0;
+        for (int i=0; i<buffer.length; i+=16) {
+            short shortVal = (short) buffer[i+1];
+            shortVal = (short) ((shortVal << 8) | buffer [i]);
+            max=Math.max(max, (int) shortVal);
+        }
+        return (float) max / Short.MAX_VALUE;
+    }
+
     //This thread puts the captured audio in the ByteArrayOutputStream object, and optionally sends it
     //to the speech server for live recognition.
     class CaptureThread extends Thread{
@@ -452,7 +508,6 @@ public class ExampleApp extends JFrame {
 
         byte tempBuffer[] = new byte[8000];
         public void run(){
-            byteArrayOutputStream = new ByteArrayOutputStream();
             stopCapture = false;
             try {
                 //Loop until stopCapture is set by another thread that services the Stop button.
@@ -460,10 +515,10 @@ public class ExampleApp extends JFrame {
                     //Read data from the internal buffer of the data line.
                     int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
                     if(cnt > 0){
-                        byteArrayOutputStream.write(tempBuffer, 0, cnt);
-                        if (liveBox.isSelected()) {
-                            session.sendChunk(tempBuffer, false);
-                        }
+                        session.sendChunk(tempBuffer, false);
+                        double level=Math.log10(getLevel(tempBuffer));
+                        // System.out.println("VU level: " + 20* level + " dB");
+                        vumeter.setlevel((float) (level+1));
                     }
                     if (sendPong) {
                         sendPong = false;
@@ -471,11 +526,8 @@ public class ExampleApp extends JFrame {
                     }
 
                 }
-                byteArrayOutputStream.close();
-                if (liveBox.isSelected()) {
-                    byte tmp[] = new byte[0];
-                    session.sendChunk(tmp,  true);
-                }
+                byte tmp[] = new byte[0];
+                session.sendChunk(tmp,  true);
             } catch (Exception e) {
                 System.out.println(e);
                 System.exit(0);

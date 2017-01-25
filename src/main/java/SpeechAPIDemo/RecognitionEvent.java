@@ -70,6 +70,7 @@ public class RecognitionEvent {
 	
 	public static class Hypothesis {
 		private String transcript;
+		private String ctmline;
 		private float confidence;
 		
 		public Hypothesis(String transcript, float confidence) {
@@ -77,8 +78,18 @@ public class RecognitionEvent {
 			this.confidence = confidence;
 		}
 
+		public Hypothesis(String transcript, float confidence, String ctmline) {
+			this.transcript = transcript;
+			this.confidence = confidence;
+			this.ctmline = ctmline;
+		}
+
 		public String getTranscript() {
 			return transcript;
+		}
+
+		public String getCtmline() {
+			return ctmline;
 		}
 
 		public float getConfidence() {
@@ -92,6 +103,8 @@ public class RecognitionEvent {
 			result = prime * result + Float.floatToIntBits(confidence);
 			result = prime * result
 					+ ((transcript == null) ? 0 : transcript.hashCode());
+			result = prime * result
+					+ ((ctmline == null) ? 0 : ctmline.hashCode());
 			return result;
 		}
 
@@ -112,13 +125,18 @@ public class RecognitionEvent {
 					return false;
 			} else if (!transcript.equals(other.transcript))
 				return false;
+			if (ctmline == null) {
+				if (other.ctmline != null)
+					return false;
+			} else if (!ctmline.equals(other.ctmline))
+				return false;
 			return true;
 		}
 
 		@Override
 		public String toString() {
 			return "Hypothesis [confidence=" + confidence + ", transcript="
-					+ transcript + "]";
+					+ transcript + ", ctmline=" + ctmline + "]";
 		}
 	}
 	

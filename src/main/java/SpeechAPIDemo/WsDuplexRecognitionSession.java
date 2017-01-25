@@ -116,15 +116,20 @@ public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
 	public static RecognitionEvent parseRecognitionEventJson(String json) {
 		Object obj = JSONValue.parse(json);
 
+		System.err.println("Got raw event: " + obj);
+
 		if (obj == null) {
 			return null;
 		}
 		JSONObject jsonObj = (JSONObject) obj;
 		long status = (Long)jsonObj.get("status");
 		RecognitionEvent.Result result = null;
+		double segmentStart=0.0;
+		if (jsonObj.containsKey("segment-start")) {
+			segmentStart= (Double) jsonObj.get("segment-start");
+		}
 		if (jsonObj.containsKey("result")) {
 			JSONObject jo1 = (JSONObject) jsonObj.get("result");
-			
 			boolean isFinal = (Boolean)jo1.get("final");
 			List<RecognitionEvent.Hypothesis> hyps = new ArrayList<RecognitionEvent.Hypothesis>();
 			for (Object o1 : (JSONArray) jo1.get("hypotheses")) {
@@ -134,7 +139,17 @@ public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
 				if (jo2.containsKey("confidence")) {
 					confidence = (Double) jo2.get("confidence");
 				}
-				hyps.add(new RecognitionEvent.Hypothesis(transcript, (float) confidence));
+				String ctmLine="";
+				if (jo2.containsKey("word-alignment")) {
+					for (Object o2 : (JSONArray) jo2.get("word-alignment")) {
+						JSONObject jo3 = (JSONObject) o2;
+						double starttime = (Double) jo3.get("start") + segmentStart;
+						double length = (Double) jo3.get("length");
+						String word = (String) jo3.get("word");
+						ctmLine = String.format(ctmLine + "live 1 %7.2f %5.2f %s\n", starttime, length, word);
+					}
+				}
+				hyps.add(new RecognitionEvent.Hypothesis(transcript, (float) confidence, ctmLine));
 			}
 			result = new RecognitionEvent.Result(isFinal, hyps);
 		}
