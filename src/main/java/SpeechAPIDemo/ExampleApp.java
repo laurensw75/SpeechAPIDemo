@@ -1,21 +1,23 @@
 package SpeechAPIDemo;
 
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+
+import javax.sound.sampled.*;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.util.*;
-import javax.swing.*;
-
-import java.awt.*;
-import java.awt.event.*;
-import javax.sound.sampled.*;
-
-import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
-
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -181,34 +183,60 @@ public class ExampleApp extends JFrame {
 
     private static void sendFile(DuplexRecognitionSession session, File file, int bytesPerSecond) throws IOException, InterruptedException {
         AudioInputStream in=null;
+        AudioInputStream pin=null;
         AudioInputStream din=null;
+
         try {
+            // The trick is to first convert the input format to PCM, and then do the remix/resample
+            // as a separate step
             in = AudioSystem.getAudioInputStream(file);
-            din = AudioSystem.getAudioInputStream(getAudioFormat(), in);
+            AudioFormat baseFormat=in.getFormat();
+            AudioFormat pcmFormat=new AudioFormat(AudioFormat.Encoding.PCM_SIGNED,
+                    baseFormat.getSampleRate(),16,
+                    baseFormat.getChannels(),baseFormat.getChannels() * 2,
+                    baseFormat.getSampleRate(),false);
+            pin = AudioSystem.getAudioInputStream(pcmFormat, in);
+            din = AudioSystem.getAudioInputStream(getAudioFormat(), pin);
 
             int chunksPerSecond = 4;
+            int targetChunkSize = bytesPerSecond / chunksPerSecond;
+            int chunkSize = 1000;
+            int nrCombinedChunks = targetChunkSize/chunkSize;
 
-            byte buf[] = new byte[bytesPerSecond / chunksPerSecond];
+            byte buf[] = new byte[chunkSize];
+            byte outputBuf[] = new byte[targetChunkSize];
 
             while (true) {
-                long millisWithinChunkSecond = System.currentTimeMillis() % (1000 / chunksPerSecond);
-                int size = din.read(buf);
-                System.err.println("File size:" + size);
-                if (size < 0) {
-                    byte buf2[] = new byte[0];
-                    session.sendChunk(buf2, true);
-                    break;
+                int i=0;
+                int size=chunkSize;
+
+                while (i<nrCombinedChunks && size == chunkSize){
+                    size = din.read(buf);
+
+                    if (size == chunkSize) {
+                        System.arraycopy(buf, 0, outputBuf, i*chunkSize, chunkSize);
+                    } else if (size >= 0) {
+                        System.arraycopy(buf, 0, outputBuf, i*chunkSize, chunkSize);
+                        int newlen=i*chunkSize+size;
+                        byte buf2[] = Arrays.copyOf(outputBuf, i*chunkSize+size);
+                        session.sendChunk(buf2, true);
+                        break;
+                    } else {
+                        byte buf2[] = new byte[0];
+                        session.sendChunk(buf2, true);
+                        break;
+                    }
+
+                    i++;
                 }
 
-                if (size == bytesPerSecond / chunksPerSecond) {
-                    session.sendChunk(buf, false);
-
+                if (size == chunkSize) {
+                    //complete chunk combination
+                    session.sendChunk(outputBuf, false);
+                    Thread.sleep(50);
                 } else {
-                    byte buf2[] = Arrays.copyOf(buf, size);
-                    session.sendChunk(buf2, true);
                     break;
                 }
-                Thread.sleep(50);
             }
             in.close();
         } catch (Exception e) {
