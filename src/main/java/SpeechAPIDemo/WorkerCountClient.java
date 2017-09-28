@@ -1,9 +1,12 @@
 package SpeechAPIDemo;
 
 import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.client.DefaultSSLWebSocketClientFactory;
 import org.java_websocket.handshake.ServerHandshake;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
+import javax.net.ssl.SSLContext;
+import java.security.*;
 
 import java.net.URI;
 
@@ -17,6 +20,18 @@ class WorkerCountClient extends WebSocketClient {
     public WorkerCountClient(URI serverURI, WorkerCountInterface handler) {
         super(serverURI);
         this.handler = handler;
+
+        SSLContext sslContext = null;
+        try {
+            sslContext = SSLContext.getInstance( "TLS" );
+            sslContext.init( null, null, null ); // will use java's default key and trust store which is sufficient unless you deal with self-signed certificates
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
+        }
+
+        this.setWebSocketFactory( new DefaultSSLWebSocketClientFactory( sslContext ) );
     }
 
     @Override

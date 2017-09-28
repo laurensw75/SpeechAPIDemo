@@ -1,5 +1,6 @@
 package SpeechAPIDemo;
 
+import org.java_websocket.client.DefaultSSLWebSocketClientFactory;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.json.simple.JSONArray;
@@ -7,10 +8,13 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 
+import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
@@ -22,7 +26,20 @@ public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
 		private JSONParser parser=new JSONParser();
 		
 		public MyWsClient(URI serverURI) {
+
 			super(serverURI);
+
+			SSLContext sslContext = null;
+			try {
+				sslContext = SSLContext.getInstance( "TLS" );
+				sslContext.init( null, null, null ); // will use java's default key and trust store which is sufficient unless you deal with self-signed certificates
+			} catch (NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			} catch (KeyManagementException e) {
+				e.printStackTrace();
+			}
+
+			this.setWebSocketFactory( new DefaultSSLWebSocketClientFactory( sslContext ) );
 		}
 
 		@Override
