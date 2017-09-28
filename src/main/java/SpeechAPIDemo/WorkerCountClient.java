@@ -21,17 +21,19 @@ class WorkerCountClient extends WebSocketClient {
         super(serverURI);
         this.handler = handler;
 
-        SSLContext sslContext = null;
-        try {
-            sslContext = SSLContext.getInstance( "TLS" );
-            sslContext.init( null, null, null ); // will use java's default key and trust store which is sufficient unless you deal with self-signed certificates
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (KeyManagementException e) {
-            e.printStackTrace();
+        if (serverURI.toString().startsWith("wss")) {
+            SSLContext sslContext = null;
+            try {
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, null, null); // will use java's default key and trust store which is sufficient unless you deal with self-signed certificate
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (KeyManagementException e) {
+                e.printStackTrace();
+            }
+            this.setWebSocketFactory(new DefaultSSLWebSocketClientFactory(sslContext));
         }
 
-        this.setWebSocketFactory( new DefaultSSLWebSocketClientFactory( sslContext ) );
     }
 
     @Override
