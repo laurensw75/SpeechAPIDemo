@@ -9,6 +9,7 @@ You can compile this program using:
 `$ mvn package`
 
 Alternatively, you can use the provided .zip to get the same result.
+
 Run the application using:
 
 `$ java -jar target/SpeechAPIDemo-1.0.jar server:port [userid] [contentid]`
