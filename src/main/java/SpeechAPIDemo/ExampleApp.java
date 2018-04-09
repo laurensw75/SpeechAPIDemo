@@ -10,17 +10,16 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-
+import org.concentus.*;
+import org.gagravarr.ogg.*;
+import org.gagravarr.opus.*;
 
 public class ExampleApp extends JFrame {
 
@@ -44,8 +43,11 @@ public class ExampleApp extends JFrame {
 
     final static JButton filechooseBtn = new JButton("Select File");
     final static JButton liveBtn = new JButton("Start Live Recognition");
+    final static String [] compressionString = {"off (256kb/s)", "128kb/s", "64kb/s", "32kb/s", "16kb/s"};
+    final static JComboBox compression = new JComboBox(compressionString);
     final Font defaultFont;
 
+    private static JLabel compressionLabel = new JLabel ("Opus Compression");
     private static JLabel statusLabel = new JLabel("");
     private static JLabel langLabel = new JLabel("");
 
@@ -182,59 +184,23 @@ public class ExampleApp extends JFrame {
     }
 
     private static void sendFile(DuplexRecognitionSession session, File file, int bytesPerSecond) throws IOException, InterruptedException {
-        AudioInputStream in=null;
-        AudioInputStream pin=null;
-        AudioInputStream din=null;
-
         try {
-            // The trick is to first convert the input format to PCM, and then do the remix/resample
-            // as a separate step
-            in = AudioSystem.getAudioInputStream(file);
-            AudioFormat baseFormat=in.getFormat();
-            AudioFormat pcmFormat=new AudioFormat(AudioFormat.Encoding.PCM_SIGNED,
-                    baseFormat.getSampleRate(),16,
-                    baseFormat.getChannels(),baseFormat.getChannels() * 2,
-                    baseFormat.getSampleRate(),false);
-            pin = AudioSystem.getAudioInputStream(pcmFormat, in);
-            din = AudioSystem.getAudioInputStream(getAudioFormat(), pin);
-
-            int chunksPerSecond = 4;
-            int targetChunkSize = bytesPerSecond / chunksPerSecond;
-            int chunkSize = 1000;
-            int nrCombinedChunks = targetChunkSize/chunkSize;
-
+            FileInputStream in = new FileInputStream(file);
+            int chunkSize = 8000;
+            int waittime=(int)(((double)chunkSize/bytesPerSecond)*1000);
             byte buf[] = new byte[chunkSize];
-            byte outputBuf[] = new byte[targetChunkSize];
+            int size;
+            long lasttime=System.currentTimeMillis();
 
             while (true) {
-                int i=0;
-                int size=chunkSize;
-
-                while (i<nrCombinedChunks && size == chunkSize){
-                    size = din.read(buf);
-
-                    if (size == chunkSize) {
-                        System.arraycopy(buf, 0, outputBuf, i*chunkSize, chunkSize);
-                    } else if (size >= 0) {
-                        System.arraycopy(buf, 0, outputBuf, i*chunkSize, chunkSize);
-                        int newlen=i*chunkSize+size;
-                        byte buf2[] = Arrays.copyOf(outputBuf, i*chunkSize+size);
-                        session.sendChunk(buf2, true);
-                        break;
-                    } else {
-                        byte buf2[] = new byte[0];
-                        session.sendChunk(buf2, true);
-                        break;
-                    }
-
-                    i++;
-                }
-
-                if (size == chunkSize) {
-                    //complete chunk combination
-                    session.sendChunk(outputBuf, false);
-                    Thread.sleep(50);
+                size = in.read(buf);
+                if (size > 0) {
+                    session.sendChunk(buf, false);
+                    Thread.sleep(waittime-(int)(System.currentTimeMillis()-lasttime));
+                    lasttime=System.currentTimeMillis();
                 } else {
+                    byte buf2[] = new byte[0];
+                    session.sendChunk(buf2, true);
                     break;
                 }
             }
@@ -247,7 +213,11 @@ public class ExampleApp extends JFrame {
     public static void main(String[] args) {
         if ((args.length>0) && (args[0].matches("^.*:[0-9]+$"))) {
             DEFAULT_WS_URL = "ws://"+args[0]+"/client/ws/speech";
+            // DEFAULT_WS_URL="wss://nlspraak.ewi.utwente.nl:8882/dev/duplex-speech-api/dutch/ws/speech";
+           //  DEFAULT_WS_URL="wss://www.mdoit.nl:8889/client/ws/speech";
             DEFAULT_WS_STATUS_URL = "ws://"+args[0]+"/client/ws/status";
+            // DEFAULT_WS_STATUS_URL="wss://nlspraak.ewi.utwente.nl:8882/dev/duplex-speech-api/dutch/ws/status";
+            // DEFAULT_WS_STATUS_URL="wss://www.mdoit.nl:8889/client/ws/status";
             if (args.length>1) {
                 UserID=args[1];
             }
@@ -312,11 +282,14 @@ public class ExampleApp extends JFrame {
             RecognitionEventAccumulator statusEventAccumulator = new RecognitionEventAccumulator();
             URI statusUri = new URI(DEFAULT_WS_STATUS_URL);
             WorkerCountClient status_session = new WorkerCountClient(statusUri,statusEventAccumulator);
+
             status_session.connect();
         } catch (Exception e3) {
             System.err.println("Caught Exception: " + e3.getMessage());
         }
 
+        compression.setFont(defaultFont);
+        compressionLabel.setFont(defaultFont);
         filechooseBtn.setFont(defaultFont);
         liveBtn.setFont(defaultFont);
 
@@ -361,11 +334,13 @@ public class ExampleApp extends JFrame {
                             stopCapture = true;
                             targetDataLine.close();
                             filechooseBtn.setEnabled(true);
+                            compression.setEnabled(true);
                             liveBtn.setText("Start Live Recognition");
                         } else {
                             liveRecognition=true;
                             liveBtn.setText("Stop Live Recognition");
                             filechooseBtn.setEnabled(false);
+                            compression.setEnabled(false);
                             WsDuplexRecognitionSession session = null;
                             try {
                                 RecognitionEventAccumulator eventAccumulator = new RecognitionEventAccumulator();
@@ -455,6 +430,9 @@ public class ExampleApp extends JFrame {
                                 .addComponent(filechooseBtn)
                                 .addComponent(liveBtn)
                                 .addComponent(vumeter))
+                        .addGroup(layout.createSequentialGroup()
+                                .addComponent(compressionLabel)
+                                .addComponent(compression))
                         .addComponent(textArea)
                         .addComponent(resultsArea)
                         .addComponent(statusLabel)
@@ -466,6 +444,9 @@ public class ExampleApp extends JFrame {
                                 .addComponent(filechooseBtn)
                                 .addComponent(liveBtn)
                                 .addComponent(vumeter))
+                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+                                .addComponent(compressionLabel)
+                                .addComponent(compression))
                         .addComponent(textArea)
                         .addComponent(resultsArea)
                         .addComponent(statusLabel)
@@ -534,16 +515,83 @@ public class ExampleApp extends JFrame {
             this.session=session;
         }
 
-        byte tempBuffer[] = new byte[8000];
+        byte tempBuffer[] = new byte[1920];
+        byte data_packet[] = new byte[1275];
+        int bitrate=0;
+        int packetSamples=960;
+        OpusEncoder encoder;
+        OpusFile file;
+        OpusInfo info;
+        OggPacketWriter OPwriter;
+;
+        ByteArrayOutputStream BAOut;
+
+
         public void run(){
             stopCapture = false;
+
+            String compressionSelect=compression.getSelectedItem().toString();
+            if (compressionSelect==compressionString[1]) {
+                bitrate=128000;
+            } else if (compressionSelect==compressionString[2]) {
+                bitrate=64000;
+            } else if (compressionSelect==compressionString[3]) {
+                bitrate=32000;
+            } else if (compressionSelect==compressionString[4]) {
+                bitrate=16000;
+            }
+
+            System.out.println("Bitrate: " + bitrate + " kbit/second");
+
             try {
+                if (bitrate==0) {
+                    //With no compression we send pcm data. To instruct our decoder, we make a wav header first.
+                    session.sendChunk(CreateWAVHeader((int) audioFormat.getSampleRate(), audioFormat.getChannels(), audioFormat.getSampleSizeInBits()), false);
+                } else {
+                    // for an opus encoded stream we need to create the opusencoder, and also setup the stream writer
+                    encoder = new OpusEncoder(16000, 1, OpusApplication.OPUS_APPLICATION_AUDIO);
+                    encoder.setBitrate(bitrate);
+                    encoder.setSignalType(OpusSignal.OPUS_SIGNAL_MUSIC);
+                    encoder.setComplexity(10);
+                    encoder.setUseVBR(true);
+                    BAOut = new ByteArrayOutputStream();
+
+                    info = new OpusInfo();
+                    info.setNumChannels(1);
+                    info.setSampleRate(16000);
+                    OpusTags tags = new OpusTags();
+                    file = new OpusFile(BAOut, info, tags);
+                    OPwriter = file.getOggFile().getPacketWriter();
+                    OPwriter.bufferPacket(info.write(), false);
+                    OPwriter.bufferPacket(tags.write(), false);
+                }
+
+                int written=0;
                 //Loop until stopCapture is set by another thread that services the Stop button.
                 while(!stopCapture){
                     //Read data from the internal buffer of the data line.
                     int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
-                    if(cnt > 0){
-                        session.sendChunk(tempBuffer, false);
+                    if(cnt > 0) {
+                        if (bitrate>0) {
+                            // let's use encryption
+                            short[] pcm = BytesToShorts(tempBuffer, 0, tempBuffer.length);
+                            int bytesEncoded = encoder.encode(pcm, 0, packetSamples, data_packet, 0, 1275);
+                            byte[] packet = new byte[bytesEncoded];
+                            System.arraycopy(data_packet, 0, packet, 0, bytesEncoded);
+                            OpusAudioData data = new OpusAudioData(packet);
+
+                            OPwriter.bufferPacket(data.write(), true);
+                            // let's send it out in chunks of ~0.25sec. VBR will cause the chunks to typically be a bit larger.
+                            if (BAOut.size()>(bitrate/32)) {
+                                session.sendChunk(BAOut.toByteArray(), false);
+                                BAOut.reset();
+                            }
+
+                            // System.out.println("bytesEncoded: " +bytesEncoded);
+                        } else {
+                            session.sendChunk(tempBuffer, false);
+                        }
+
                         double level=Math.log10(getLevel(tempBuffer));
                         // System.out.println("VU level: " + 20* level + " dB");
                         vumeter.setlevel((float) (level+1));
@@ -554,6 +602,7 @@ public class ExampleApp extends JFrame {
                     }
 
                 }
+
                 byte tmp[] = new byte[0];
                 session.sendChunk(tmp,  true);
             } catch (Exception e) {
@@ -562,4 +611,86 @@ public class ExampleApp extends JFrame {
             }
         }
     }
+
+    public static short[] BytesToShorts(byte[] input) {
+        return BytesToShorts(input, 0, input.length);
+    }
+
+    public static short[] BytesToShorts(byte[] input, int offset, int length) {
+        short[] processedValues = new short[length / 2];
+        for (int c = 0; c < processedValues.length; c++) {
+            short a = (short) (((int) input[(c * 2) + offset]) & 0xFF);
+            short b = (short) (((int) input[(c * 2) + 1 + offset]) << 8);
+            processedValues[c] = (short) (a | b);
+        }
+
+        return processedValues;
+    }
+
+    public static byte[] ShortsToBytes(short[] input) {
+        return ShortsToBytes(input, 0, input.length);
+    }
+
+    public static byte[] ShortsToBytes(short[] input, int offset, int length) {
+        byte[] processedValues = new byte[length * 2];
+        for (int c = 0; c < length; c++) {
+            processedValues[c * 2] = (byte) (input[c + offset] & 0xFF);
+            processedValues[c * 2 + 1] = (byte) ((input[c + offset] >> 8) & 0xFF);
+        }
+
+        return processedValues;
+    }
+
+    public static byte[] CreateWAVHeader(int samplerate, int channels, int format) {
+        byte[] header = new byte[44];
+        long totalDataLen = 36;
+        long bitrate = samplerate*channels*format;
+        header[0] = 'R';
+        header[1] = 'I';
+        header[2] = 'F';
+        header[3] = 'F';
+        header[4] = (byte) (totalDataLen & 0xff);
+        header[5] = (byte) ((totalDataLen >> 8) & 0xff);
+        header[6] = (byte) ((totalDataLen >> 16) & 0xff);
+        header[7] = (byte) ((totalDataLen >> 24) & 0xff);
+        header[8] = 'W';
+        header[9] = 'A';
+        header[10] = 'V';
+        header[11] = 'E';
+        header[12] = 'f';
+        header[13] = 'm';
+        header[14] = 't';
+        header[15] = ' ';
+        header[16] = (byte) format;
+        header[17] = 0;
+        header[18] = 0;
+        header[19] = 0;
+        header[20] = 1;
+        header[21] = 0;
+        header[22] = (byte) channels;
+        header[23] = 0;
+        header[24] = (byte) (samplerate & 0xff);
+        header[25] = (byte) ((samplerate >> 8) & 0xff);
+        header[26] = (byte) ((samplerate >> 16) & 0xff);
+        header[27] = (byte) ((samplerate >> 24) & 0xff);
+        header[28] = (byte) ((bitrate / 8) & 0xff);
+        header[29] = (byte) (((bitrate / 8) >> 8) & 0xff);
+        header[30] = (byte) (((bitrate / 8) >> 16) & 0xff);
+        header[31] = (byte) (((bitrate / 8) >> 24) & 0xff);
+        header[32] = (byte) ((channels* format) / 8);
+        header[33] = 0;
+        header[34] = 16;
+        header[35] = 0;
+        header[36] = 'd';
+        header[37] = 'a';
+        header[38] = 't';
+        header[39] = 'a';
+        header[40] = (byte) (0  & 0xff);
+        header[41] = (byte) ((0 >> 8) & 0xff);
+        header[42] = (byte) ((0 >> 16) & 0xff);
+        header[43] = (byte) ((0 >> 24) & 0xff);
+
+        return header;
+    }
+
 }

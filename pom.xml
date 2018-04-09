@@ -13,6 +13,14 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>in-project</id>
+            <name>In Project Repo</name>
+            <url>file://${project.basedir}/lib</url>
+        </repository>
+    </repositories>
+
     <build>
         <plugins>
             <plugin>
@@ -62,8 +70,6 @@
         </plugins>
     </build>
 
-
-
     <dependencies>
         <dependency>
             <groupId>org.java-websocket</groupId>
@@ -76,11 +82,20 @@
             <version>1.1</version>
         </dependency>
         <dependency>
-            <groupId>com.googlecode.soundlibs</groupId>
-            <artifactId>mp3spi</artifactId>
-            <version>1.9.5-1</version>
+            <groupId>org.gaggravar</groupId>
+            <artifactId>vorbis-java-core</artifactId>
+            <version>0.8</version>
         </dependency>
-
+	<dependency>
+            <groupId>org.gaggravar</groupId>
+            <artifactId>vorbis-java-tools</artifactId>
+            <version>0.8</version>
+	</dependency>
+        <dependency>
+            <groupId>org.concentus</groupId>
+            <artifactId>Concentus</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
 
 </project>

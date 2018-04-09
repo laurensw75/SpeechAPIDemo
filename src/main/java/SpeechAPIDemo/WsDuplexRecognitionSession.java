@@ -18,8 +18,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
-
-	
 	
 	class MyWsClient extends WebSocketClient {
 
@@ -83,7 +81,11 @@ public class WsDuplexRecognitionSession implements DuplexRecognitionSession {
 	public WsDuplexRecognitionSession(String serverUrl) throws IOException, URISyntaxException {		
 		this.serverUrl = serverUrl;
 		this.parameters = new HashMap<String, String>();
-		this.parameters.put("content-type", "audio/x-raw, layout=(string)interleaved, rate=(int)16000, format=(string)S16LE, channels=(int)1");
+		// this.parameters.put("content-type", "audio/x-raw, layout=(string)interleaved, rate=(int)16000, format=(string)S16LE, channels=(int)1");
+		// this.parameters.put("content-type", "audio/wav");
+		this.parameters.put("content-type", "");
+		// this.parameters.put("content-type", "audio/x-opus, channel-mapping-family=(int)0");
+		// this.parameters.put("content-type", "audio/x-unknown, codec-id=(string)A_OPUS, channels=(int)1");
 	}
 
 	public void connect() throws IOException {
