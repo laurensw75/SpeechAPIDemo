@@ -213,11 +213,7 @@ public class ExampleApp extends JFrame {
     public static void main(String[] args) {
         if ((args.length>0) && (args[0].matches("^.*:[0-9]+$"))) {
             DEFAULT_WS_URL = "ws://"+args[0]+"/client/ws/speech";
-            // DEFAULT_WS_URL="wss://nlspraak.ewi.utwente.nl:8882/dev/duplex-speech-api/dutch/ws/speech";
-           //  DEFAULT_WS_URL="wss://www.mdoit.nl:8889/client/ws/speech";
             DEFAULT_WS_STATUS_URL = "ws://"+args[0]+"/client/ws/status";
-            // DEFAULT_WS_STATUS_URL="wss://nlspraak.ewi.utwente.nl:8882/dev/duplex-speech-api/dutch/ws/status";
-            // DEFAULT_WS_STATUS_URL="wss://www.mdoit.nl:8889/client/ws/status";
             if (args.length>1) {
                 UserID=args[1];
             }
