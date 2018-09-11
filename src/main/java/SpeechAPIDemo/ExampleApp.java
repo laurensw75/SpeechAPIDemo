@@ -569,7 +569,7 @@ public class ExampleApp extends JFrame {
                     int cnt = targetDataLine.read(tempBuffer, 0, tempBuffer.length);
                     if(cnt > 0) {
                         if (bitrate>0) {
-                            // let's use encryption
+                            // let's use Opus compression
                             short[] pcm = BytesToShorts(tempBuffer, 0, tempBuffer.length);
                             int bytesEncoded = encoder.encode(pcm, 0, packetSamples, data_packet, 0, 1275);
                             byte[] packet = new byte[bytesEncoded];
